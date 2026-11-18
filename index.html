@@ -151,6 +151,12 @@ h2 { margin: 0 0 12px; font: 400 clamp(24px, 3vw, 32px)/1.2 var(--display); }
 .field label { font-size: 13px; color: var(--muted); }
 .field input, .field select, .field textarea { min-height: 44px; padding: 8px 10px; border: 2px solid var(--line); border-radius: 10px; background: #fff; width: 100%; }
 .field textarea { min-height: 80px; resize: vertical; }
+.hm-pick { border: 0; margin: 0; padding: 0; }
+.hm-pick legend { padding: 0; margin-bottom: 4px; font-size: 13px; color: var(--muted); }
+.hm-pick div { display: flex; gap: 6px; }
+.hm-pick select { min-height: 44px; padding: 8px 10px; border: 2px solid var(--line); border-radius: 10px; background: #fff; }
+.hm-pick select:first-child { min-width: 112px; }
+.hm-pick select:last-child { min-width: 84px; }
 .go { min-height: 44px; padding: 8px 18px; border-radius: 10px; border: 0; background: var(--ink); color: #fff; cursor: pointer; font-weight: 700; }
 .go:disabled { opacity: .5; cursor: default; }
 .items { list-style: none; margin: 12px 0 0; padding: 0; }
@@ -331,8 +337,8 @@ h2 { margin: 0 0 12px; font: 400 clamp(24px, 3vw, 32px)/1.2 var(--display); }
       <p class="sub">봉사 일정이 정해지면 날짜와 시간을 넣어 주세요. 홈페이지의 "이번 주 여는 날"과 문패에 쓰여요.</p>
       <form class="form" id="sch-form">
         <div class="field"><label for="sch-date">날짜</label><input type="date" id="sch-date" required></div>
-        <div class="field"><label for="sch-start">여는 시각</label><input type="time" id="sch-start" step="600" required></div>
-        <div class="field"><label for="sch-end">닫는 시각</label><input type="time" id="sch-end" step="600" required></div>
+        <fieldset class="field hm-pick"><legend>여는 시각</legend><div><select id="sch-start-h" aria-label="여는 시"></select><select id="sch-start-m" aria-label="여는 분"></select></div></fieldset>
+        <fieldset class="field hm-pick"><legend>닫는 시각</legend><div><select id="sch-end-h" aria-label="닫는 시"></select><select id="sch-end-m" aria-label="닫는 분"></select></div></fieldset>
         <div class="field grow"><label for="sch-note">메모 (선택)</label><input type="text" id="sch-note" maxlength="40" placeholder="예: 김○○ 봉사자"></div>
         <button class="go" type="submit">추가</button>
       </form>
@@ -787,6 +793,18 @@ const API_URL = "https://script.google.com/macros/s/AKfycbzLqKI-xexFZkcZF00-l3nQ
   }
   const add = (list, item, msgId, okText) => homeOp({ op: "add", list, item }, msgId, okText);
   const remove = (list, item, msgId, okText) => homeOp({ op: "remove", list, item }, msgId, okText);
+  // 여는/닫는 시각: 시(7~22시)와 분(10분 단위)을 따로 골라요.
+  function fillTimePick(prefix, hour) {
+    const hSel = $(prefix + "-h"), mSel = $(prefix + "-m");
+    for (let h = 7; h <= 22; h++) {
+      const o = el("option", null, h < 12 ? `오전 ${h}시` : h === 12 ? "낮 12시" : `오후 ${h - 12}시`);
+      o.value = pad(h); hSel.append(o);
+    }
+    for (let m = 0; m < 60; m += 10) { const o = el("option", null, `${pad(m)}분`); o.value = pad(m); mSel.append(o); }
+    hSel.value = pad(hour); mSel.value = "00";
+  }
+  fillTimePick("sch-start", 14);
+  fillTimePick("sch-end", 17);
   function itemRow(text, onDelete, label) {
     const li = el("li"); li.append(el("span", null, text));
     const x = el("button", "x", "삭제"); x.type = "button"; x.setAttribute("aria-label", `${label} 삭제`); x.onclick = onDelete;
@@ -845,7 +863,8 @@ const API_URL = "https://script.google.com/macros/s/AKfycbzLqKI-xexFZkcZF00-l3nQ
 
   $("sch-form").addEventListener("submit", (e) => {
     e.preventDefault();
-    const date = $("sch-date").value, start = $("sch-start").value, end = $("sch-end").value, note = $("sch-note").value.trim();
+    const date = $("sch-date").value, note = $("sch-note").value.trim();
+    const start = `${$("sch-start-h").value}:${$("sch-start-m").value}`, end = `${$("sch-end-h").value}:${$("sch-end-m").value}`;
     if (!date || !start || !end) return;
     if (end <= start) { msg("sch-msg", "닫는 시각은 여는 시각보다 늦어야 해요.", false); return; }
     add("schedule", { date, start, end, note }, "sch-msg", `${mdw(date)} ${start}–${end} 일정을 넣었어요.`)
